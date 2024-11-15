@@ -37,7 +37,7 @@ struct Match{
 
 #[storage]
 #[entrypoint]
-pub struct MatchInformationContract{
+struct MatchInformationContract{
     initialized: StorageBool,
     owner: StorageAddress,
     matchmaking_server_wallet_address: StorageAddress,
@@ -49,7 +49,7 @@ pub struct MatchInformationContract{
 
 #[public]
 impl MatchInformationContract{
-    fn init(&mut self) -> Result<(), Vec<u8>>{
+    pub fn init(&mut self) -> Result<(), Vec<u8>>{
         let initialized = self.initialized.get();
         if initialized {
             return Err("Already initialized".into());
@@ -60,22 +60,25 @@ impl MatchInformationContract{
     }
     
     //view current match making server wallet
-    fn get_matchmaking_server_wallet_address(&self) -> Address{
+    pub fn get_matchmaking_server_wallet_address(&self) -> Address{
         self.matchmaking_server_wallet_address.get()
     }
 
     //view current player info smart contract address
-    fn get_player_info_smart_contract_address(&self) -> Address{
+    pub fn get_player_info_smart_contract_address(&self) -> Address{
         self.player_info_smart_contract_address.get()
     }
 
     //view current prediction smart contract address
-    fn get_prediction_smart_contract_address(&self) -> Address{
+    pub fn get_prediction_smart_contract_address(&self) -> Address{
         self.prediction_smart_contract_address.get()
     }
 
     //only owner can set match_making_address
-    fn set_matchmaking_server_wallet_address(&mut self, address: Address) -> Result<(), Vec<u8>>{
+    pub fn set_matchmaking_server_wallet_address(&mut self, address: Address) -> Result<(), Vec<u8>>{
+        if !self.initialized.get() {
+            return Err("has not been initialized yet".into());
+        }
         if self.owner.get() != msg::sender(){
             return Err("Only owner can set match_making_address".into());
         }
@@ -84,7 +87,11 @@ impl MatchInformationContract{
     }
 
     //only owner can set player_info_smart_contract_address
-    fn set_player_info_smart_contract_address(&mut self, address: Address) -> Result<(), Vec<u8>>{
+    pub fn set_player_info_smart_contract_address(&mut self, address: Address) -> Result<(), Vec<u8>>{
+        if !self.initialized.get() {
+            return Err("has not been initialized yet".into());
+        }
+
         if self.owner.get() != msg::sender(){
             return Err("Only owner can set player_info_smart_contract_address".into());
         }
@@ -93,7 +100,11 @@ impl MatchInformationContract{
     }
 
     //only owner can set prediction_smart_contract_address
-    fn set_prediction_smart_contract_address(&mut self, address: Address) -> Result<(), Vec<u8>>{
+    pub fn set_prediction_smart_contract_address(&mut self, address: Address) -> Result<(), Vec<u8>>{
+        if !self.initialized.get() {
+            return Err("has not been initialized yet".into());
+        }
+
         if self.owner.get() != msg::sender(){
             return Err("Only owner can set prediction_smart_contract_address".into());
         }
@@ -102,12 +113,17 @@ impl MatchInformationContract{
     }
     
     //get the latest match id
-    fn get_latest_match_id(&self) -> U256{
-        self.latest_match_id.get()
+    pub fn get_latest_match_id(&self) -> Result<U256, Vec<u8>>{
+
+        if !self.initialized.get() {
+            return Err("has not been initialized yet".into());
+        }
+
+        Ok(self.latest_match_id.get())
     }
 
     //create a new match
-    fn create_match(&mut self, player1: Address, signature: Vec<u8>) -> Result<(), Vec<u8>>{
+    pub fn create_match(&mut self, player1: Address, signature: Vec<u8>) -> Result<(), Vec<u8>>{
         let match_id = self.latest_match_id.get() + U256::from(1);
         self.latest_match_id.set(match_id);
         
