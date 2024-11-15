@@ -70,27 +70,6 @@ impl MatchInformationContract{
         self.latest_match_id.set(U256::from(0));
         Ok(())
     }
-
-    //checks if all the smart contracts are initialized or not
-    pub fn is_ready(&self) -> Result<(), Vec<u8>>{
-        if !self.initialized.get() {
-            return Err("has not been initialized yet".into());
-        }
-
-        if self.matchmaking_server_wallet_address.get() == Address::zero(){
-            return Err("Match making server wallet address is not set".into());
-        }
-
-        if self.player_info_smart_contract_address.get() == Address::zero(){
-            return Err("Player info smart contract address is not set".into());
-        }
-
-        if self.prediction_smart_contract_address.get() == Address::zero(){
-            return Err("Prediction smart contract address is not set".into());
-        }
-
-        Ok(())
-    }
     
     //view current match making server wallet
     pub fn get_matchmaking_server_wallet_address(&self) -> Address{
