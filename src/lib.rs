@@ -10,13 +10,29 @@ extern crate alloc;
 use alloy_primitives::Address;
 use alloy_sol_types::sol;
 /// Import items from the SDK. The prelude contains common traits and macros.
-use stylus_sdk::{alloy_primitives::U256, msg, prelude::*, storage::{StorageAddress, StorageBool, StorageU256}};
+use stylus_sdk::{alloy_primitives::U256, msg, prelude::*, storage::{StorageAddress, StorageBool, StorageMap, StorageU256, StorageU8}};
 
 sol!{
     event matchCreated(uint256 indexed match_id, address player1, string signature);
     event matchJoined(uint256 indexed match_id, address player2, string signature);
     event matchStarted(uint256 indexed match_id, address player1, address player2, string signature);
     event matchEnded(uint256 indexed match_id, address winner, string signature);
+}
+
+
+enum GameState{
+    Finding,
+    Matched,
+    Started,
+    Ended
+}
+
+#[storage]
+struct Match{
+    exists: StorageBool,
+    player1: StorageAddress,
+    player2: StorageAddress,
+    state: StorageU8 //0 for Finding, 1 for Matched (Ready for Prediction), 2 for Started, 3 for Ended
 }
 
 #[storage]
@@ -28,6 +44,7 @@ pub struct MatchInformationContract{
     player_info_smart_contract_address: StorageAddress,
     prediction_smart_contract_address: StorageAddress,
     latest_match_id: StorageU256,
+    matches: StorageMap<U256, Match>
 }
 
 #[public]
@@ -89,5 +106,11 @@ impl MatchInformationContract{
         self.latest_match_id.get()
     }
 
-    
+    //create a new match
+    fn create_match(&mut self, player1: Address, signature: Vec<u8>) -> Result<(), Vec<u8>>{
+        let match_id = self.latest_match_id.get() + U256::from(1);
+        self.latest_match_id.set(match_id);
+        
+        Ok(())
+    }
 }
