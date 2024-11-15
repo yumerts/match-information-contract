@@ -9,19 +9,18 @@ extern crate alloc;
 
 use std::str::FromStr;
 
-use alloy_primitives::{Address, Signature};
+use alloy_primitives::{Address, Signature, U8};
 use alloy_sol_types::sol;
 // use ethers::{core::k256::ecdsa::hazmat::verify_prehashed, etherscan::verify};
 /// Import items from the SDK. The prelude contains common traits and macros.
-use stylus_sdk::{alloy_primitives::U256, msg, prelude::*, storage::{StorageAddress, StorageBool, StorageMap, StorageU256, StorageU8}};
+use stylus_sdk::{alloy_primitives::U256, evm, msg, prelude::*, storage::{StorageAddress, StorageBool, StorageMap, StorageU256, StorageU8}};
 
 sol!{
-    event matchCreated(uint256 indexed match_id, address player1, string signature);
-    event matchJoined(uint256 indexed match_id, address player2, string signature);
-    event matchStarted(uint256 indexed match_id, address player1, address player2, string signature);
-    event matchEnded(uint256 indexed match_id, address winner, string signature);
+    event matchCreated(uint256 indexed match_id, address indexed player1);
+    event matchJoined(uint256 indexed match_id, address indexed player2);
+    event matchStarted(uint256 indexed match_id, address indexed player1, address indexed player2);
+    event matchEnded(uint256 indexed match_id, address indexed winner);
 }
-
 
 enum GameState{
     Finding,
@@ -125,31 +124,64 @@ impl MatchInformationContract{
         Ok(self.latest_match_id.get())
     }
 
-    //create a new match
-    pub fn create_match(&mut self, player1: Address, server_signature_string: String) -> Result<(), Vec<u8>>{
-       /*
+    //create a match
+    //set the sender as player 1
+    pub fn create_match(&mut self) -> Result<(), Vec<u8>>{
+       
         if !self.initialized.get() {
             return Err("has not been initialized yet".into());
         }
 
         let latest_match_id = self.latest_match_id.get();
-        //checks if the digit
-        alloy_primitives::Signature::
 
         //add match to the storage
         let mut match_setter = self.matches.setter(latest_match_id);
         match_setter.exists.set(true);
-        match_setter.player1.set(player1);
+        match_setter.player1.set(msg::sender());
+        match_setter.state.set(U8::from(0));
 
         let match_id = self.latest_match_id.get() + U256::from(1);
         self.latest_match_id.set(match_id);
         
-        Ok(())*/
+        evm::log(
+            matchCreated{
+                match_id: match_id,
+                player1: msg::sender()
+            }
+        );
         Ok(())
     }
 
     //join a match
-    pub fn join_match(&mut self, player2: Address, server_signature_string: String) -> Result<(), Vec<u8>>{
+    pub fn join_match(&mut self, match_id: U256) -> Result<(), Vec<u8>>{
+        
+        if !self.initialized.get() {
+            return Err("has not been initialized yet".into());
+        }
+
+        //check if the match exists
+        let current_match = self.matches.get(match_id);
+        if !current_match.exists.get(){
+            return Err("Match does not exist".into());
+        }
+
+        //check if the match is in the finding state
+        if current_match.state.get() != U8::from(0){
+            return Err("Match is not in the finding state".into());
+        }
+
+        //set the sender as player 2
+        let mut match_setter = self.matches.setter(match_id);
+        match_setter.player2.set(msg::sender());
+        match_setter.state.set(U8::from(1));
+
+        evm::log(
+            matchJoined{
+                match_id: match_id,
+                player2: msg::sender()
+            }
+        );
+
         Ok(())
     }
 
@@ -164,9 +196,29 @@ impl MatchInformationContract{
             return Err("Match does not exist".into());
         }
 
+        if current_match.state.get() != U8::from(1){
+            return Err("Match is not in the matched state".into());
+        }
+
         if self.matchmaking_server_wallet_address.get() != msg::sender(){
             return Err("Only match making server can start a match".into());
         }
+
+        let player1 = current_match.player1.get();
+        let player2 = current_match.player2.get();
+
+        //change match state to started
+        let mut match_setter = self.matches.setter(match_id);
+        match_setter.state.set(U8::from(2));
+
+        evm::log(
+            matchStarted{
+                match_id: match_id,
+                player1: player1,
+                player2: player2
+            }
+        );
+
         Ok(())
     }
 
