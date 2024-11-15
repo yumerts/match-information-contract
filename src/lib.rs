@@ -145,5 +145,47 @@ impl MatchInformationContract{
         self.latest_match_id.set(match_id);
         
         Ok(())*/
+        Ok(())
     }
+
+    //join a match
+    pub fn join_match(&mut self, player2: Address, server_signature_string: String) -> Result<(), Vec<u8>>{
+        Ok(())
+    }
+
+    //start a match (only allowed for the match making server)
+    pub fn start_match(&mut self, match_id: U256) -> Result<(), Vec<u8>>{
+        if !self.initialized.get() {
+            return Err("has not been initialized yet".into());
+        }
+
+        let current_match = self.matches.get(match_id);
+        if !current_match.exists.get(){
+            return Err("Match does not exist".into());
+        }
+
+        if self.matchmaking_server_wallet_address.get() != msg::sender(){
+            return Err("Only match making server can start a match".into());
+        }
+        Ok(())
+    }
+
+    //end a match
+    pub fn end_match(&mut self, match_id: U256) -> Result<(), Vec<u8>>{
+        if !self.initialized.get() {
+            return Err("has not been initialized yet".into());
+        }
+
+        let current_match = self.matches.get(match_id);
+        if !current_match.exists.get(){
+            return Err("Match does not exist".into());
+        }
+
+        if self.matchmaking_server_wallet_address.get() != msg::sender(){
+            return Err("Only match making server can start a match".into());
+        }
+
+        Ok(())
+    }
+
 }
