@@ -8,8 +8,16 @@
 extern crate alloc;
 
 use alloy_primitives::Address;
+use alloy_sol_types::sol;
 /// Import items from the SDK. The prelude contains common traits and macros.
 use stylus_sdk::{alloy_primitives::U256, msg, prelude::*, storage::{StorageAddress, StorageBool, StorageU256}};
+
+sol!{
+    event matchCreated(uint256 indexed match_id, address player1, string signature);
+    event matchJoined(uint256 indexed match_id, address player2, string signature);
+    event matchStarted(uint256 indexed match_id, address player1, address player2, string signature);
+    event matchEnded(uint256 indexed match_id, address winner, string signature);
+}
 
 #[storage]
 #[entrypoint]
@@ -75,5 +83,11 @@ impl MatchInformationContract{
         self.prediction_smart_contract_address.set(address);
         Ok(())
     }
+    
+    //get the latest match id
+    fn get_latest_match_id(&self) -> U256{
+        self.latest_match_id.get()
+    }
+
     
 }
