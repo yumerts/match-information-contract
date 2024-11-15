@@ -15,6 +15,16 @@ use alloy_sol_types::sol;
 /// Import items from the SDK. The prelude contains common traits and macros.
 use stylus_sdk::{alloy_primitives::U256, evm, msg, prelude::*, storage::{StorageAddress, StorageBool, StorageMap, StorageU256, StorageU8}};
 
+sol_interface! {
+    interface IPlayerInfoContract {   
+        function addMatchResults(address player_address, bool was_won) external;
+    }
+
+    interface PredictionContract{
+
+    }
+}
+
 sol!{
     event matchCreated(uint256 indexed match_id, address indexed player1);
     event matchJoined(uint256 indexed match_id, address indexed player2);
@@ -58,6 +68,27 @@ impl MatchInformationContract{
         }
         self.owner.set(msg::sender());
         self.latest_match_id.set(U256::from(0));
+        Ok(())
+    }
+
+    //checks if all the smart contracts are initialized or not
+    pub fn is_ready(&self) -> Result<(), Vec<u8>>{
+        if !self.initialized.get() {
+            return Err("has not been initialized yet".into());
+        }
+
+        if self.matchmaking_server_wallet_address.get() == Address::zero(){
+            return Err("Match making server wallet address is not set".into());
+        }
+
+        if self.player_info_smart_contract_address.get() == Address::zero(){
+            return Err("Player info smart contract address is not set".into());
+        }
+
+        if self.prediction_smart_contract_address.get() == Address::zero(){
+            return Err("Prediction smart contract address is not set".into());
+        }
+
         Ok(())
     }
     
@@ -223,7 +254,7 @@ impl MatchInformationContract{
     }
 
     //end a match
-    pub fn end_match(&mut self, match_id: U256) -> Result<(), Vec<u8>>{
+    pub fn end_match(&mut self, match_id: U256, winner: U256) -> Result<(), Vec<u8>>{
         if !self.initialized.get() {
             return Err("has not been initialized yet".into());
         }
@@ -236,6 +267,29 @@ impl MatchInformationContract{
         if self.matchmaking_server_wallet_address.get() != msg::sender(){
             return Err("Only match making server can start a match".into());
         }
+
+        
+        let player1 = current_match.player1.get();
+        let player2 = current_match.player2.get();
+
+        //change match state to ended
+        let mut match_setter = self.matches.setter(match_id);
+        match_setter.state.set(U8::from(3));
+
+        let player_info_contract = IPlayerInfoContract::new(self.player_info_smart_contract_address.get());
+        let player1_info_update_result =  player_info_contract.add_match_results(self, player1, winner == U256::from(1));
+        if player1_info_update_result.is_err() {
+            return Err("Error updating player 1 info".into());
+        }
+
+        let player2_info_update_result = player_info_contract.add_match_results(self, player2, winner == U256::from(2));
+
+        evm::log(
+            matchEnded{
+                match_id: match_id,
+                winner: if winner == U256::from(1) { player1 } else { player2 }
+            }
+        );
 
         Ok(())
     }
