@@ -7,8 +7,11 @@
 #![cfg_attr(not(feature = "export-abi"), no_main)]
 extern crate alloc;
 
-use alloy_primitives::Address;
+use std::str::FromStr;
+
+use alloy_primitives::{Address, Signature};
 use alloy_sol_types::sol;
+// use ethers::{core::k256::ecdsa::hazmat::verify_prehashed, etherscan::verify};
 /// Import items from the SDK. The prelude contains common traits and macros.
 use stylus_sdk::{alloy_primitives::U256, msg, prelude::*, storage::{StorageAddress, StorageBool, StorageMap, StorageU256, StorageU8}};
 
@@ -123,10 +126,24 @@ impl MatchInformationContract{
     }
 
     //create a new match
-    pub fn create_match(&mut self, player1: Address, signature: Vec<u8>) -> Result<(), Vec<u8>>{
+    pub fn create_match(&mut self, player1: Address, server_signature_string: String) -> Result<(), Vec<u8>>{
+       /*
+        if !self.initialized.get() {
+            return Err("has not been initialized yet".into());
+        }
+
+        let latest_match_id = self.latest_match_id.get();
+        //checks if the digit
+        alloy_primitives::Signature::
+
+        //add match to the storage
+        let mut match_setter = self.matches.setter(latest_match_id);
+        match_setter.exists.set(true);
+        match_setter.player1.set(player1);
+
         let match_id = self.latest_match_id.get() + U256::from(1);
         self.latest_match_id.set(match_id);
         
-        Ok(())
+        Ok(())*/
     }
 }
