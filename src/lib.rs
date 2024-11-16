@@ -295,9 +295,10 @@ impl MatchInformationContract{
         //change match state to ended
         let mut match_setter = self.matches.setter(match_id);
         match_setter.state.set(U8::from(4));
-
-        if self.update_player_info(winner, player1, player2).is_err(){
-            return Err("Error Updating Player Information After Match Ended".into());
+        
+        let update_player_info_result = self.update_player_info(winner, player1, player2);
+        if update_player_info_result.is_err(){
+            return Err(update_player_info_result.unwrap_err().into());
         }
 
         let prediction_contract = IPredictionContract::new(self.prediction_smart_contract_address.get());
@@ -323,7 +324,7 @@ impl MatchInformationContract{
         let player_info_contract = IPlayerInfoContract::new(self.player_info_smart_contract_address.get());
         let player_info_update =  player_info_contract.add_match_results(self, if winner == U256::from(1) { player1 } else { player2 }, if winner == U256::from(1) { player2 } else { player1 });
         if player_info_update.is_err() {
-            return Err("Error Updating Player Information After Match Ended".into());
+            return Err(player_info_update.unwrap_err().into());
         }
         Ok(())
     }
