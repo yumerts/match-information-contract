@@ -7,9 +7,7 @@
 #![cfg_attr(not(feature = "export-abi"), no_main)]
 extern crate alloc;
 
-use std::str::FromStr;
-
-use alloy_primitives::{Address, Signature, U8};
+use alloy_primitives::{Address, U8};
 use alloy_sol_types::sol;
 // use ethers::{core::k256::ecdsa::hazmat::verify_prehashed, etherscan::verify};
 /// Import items from the SDK. The prelude contains common traits and macros.
@@ -20,8 +18,15 @@ sol_interface! {
         function addMatchResults(address winner_address, address loser_address) external;
     }
 
-    interface PredictionContract{
+    interface IPredictionContract{
+        // use this after two players have join the same match
+        function createPredictionPool(uint256 match_id) external;
 
+        // use this to block prediction after the match starts
+        function stopAllowPrediction(uint256 match_id) external;
+
+        // use this to submit prediction
+        function submitMatchResults(uint256 match_id, uint256 winner) external;
     }
 }
 
@@ -185,6 +190,12 @@ impl MatchInformationContract{
         match_setter.player2.set(msg::sender());
         match_setter.state.set(U8::from(1));
 
+        let prediction_contract = IPredictionContract::new(self.prediction_smart_contract_address.get());
+        let prediction_pool_creation = prediction_contract.create_prediction_pool(self, match_id);
+        if prediction_pool_creation.is_err(){
+            return Err("Error Creating Prediction Pool".into());
+        }
+
         evm::log(
             matchJoined{
                 match_id: match_id,
@@ -221,6 +232,12 @@ impl MatchInformationContract{
         let mut match_setter = self.matches.setter(match_id);
         match_setter.state.set(U8::from(2));
 
+        let prediction_contract = IPredictionContract::new(self.prediction_smart_contract_address.get());
+        let prediction_pool_creation = prediction_contract.stop_allow_prediction(self, match_id);
+        if prediction_pool_creation.is_err(){
+            return Err("Error Stopping Prediction".into());
+        }
+
         evm::log(
             matchStarted{
                 match_id: match_id,
@@ -254,10 +271,14 @@ impl MatchInformationContract{
         let mut match_setter = self.matches.setter(match_id);
         match_setter.state.set(U8::from(3));
 
-        let player_info_contract = IPlayerInfoContract::new(self.player_info_smart_contract_address.get());
-        let player_info_update =  player_info_contract.add_match_results(self, if winner == U256::from(1) { player1 } else { player2 }, if winner == U256::from(1) { player2 } else { player1 });
-        if player_info_update.is_err() {
+        if self.update_player_info(winner, player1, player2).is_err(){
             return Err("Error Updating Player Information After Match Ended".into());
+        }
+
+        let prediction_contract = IPredictionContract::new(self.prediction_smart_contract_address.get());
+        let prediction_pool_creation = prediction_contract.submit_match_results(self, match_id, winner);
+        if prediction_pool_creation.is_err(){
+            return Err("Error Submitting Prediction".into());
         }
 
         evm::log(
@@ -270,4 +291,15 @@ impl MatchInformationContract{
         Ok(())
     }
 
+}
+
+impl MatchInformationContract{
+    fn update_player_info(&mut self, winner: U256, player1: Address, player2: Address) -> Result<(), Vec<u8>>{
+        let player_info_contract = IPlayerInfoContract::new(self.player_info_smart_contract_address.get());
+        let player_info_update =  player_info_contract.add_match_results(self, if winner == U256::from(1) { player1 } else { player2 }, if winner == U256::from(1) { player2 } else { player1 });
+        if player_info_update.is_err() {
+            return Err("Error Updating Player Information After Match Ended".into());
+        }
+        Ok(())
+    }
 }
