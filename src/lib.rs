@@ -71,6 +71,7 @@ impl MatchInformationContract{
         if initialized {
             return Err("Already initialized".into());
         }
+        self.initialized.set(true);
         self.owner.set(msg::sender());
         self.latest_match_id.set(U256::from(0));
         Ok(())
