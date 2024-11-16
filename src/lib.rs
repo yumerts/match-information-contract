@@ -17,7 +17,7 @@ use stylus_sdk::{alloy_primitives::U256, evm, msg, prelude::*, storage::{Storage
 
 sol_interface! {
     interface IPlayerInfoContract {   
-        function addMatchResults(address player_address, bool was_won) external;
+        function addMatchResults(address winner_address, address loser_address) external;
     }
 
     interface PredictionContract{
@@ -247,7 +247,6 @@ impl MatchInformationContract{
             return Err("Only match making server can start a match".into());
         }
 
-        
         let player1 = current_match.player1.get();
         let player2 = current_match.player2.get();
 
@@ -256,12 +255,10 @@ impl MatchInformationContract{
         match_setter.state.set(U8::from(3));
 
         let player_info_contract = IPlayerInfoContract::new(self.player_info_smart_contract_address.get());
-        let player1_info_update_result =  player_info_contract.add_match_results(self, player1, winner == U256::from(1));
-        if player1_info_update_result.is_err() {
-            return Err("Error updating player 1 info".into());
+        let player_info_update =  player_info_contract.add_match_results(self, if winner == U256::from(1) { player1 } else { player2 }, if winner == U256::from(1) { player2 } else { player1 });
+        if player_info_update.is_err() {
+            return Err("Error Updating Player Information After Match Ended".into());
         }
-
-        let player2_info_update_result = player_info_contract.add_match_results(self, player2, winner == U256::from(2));
 
         evm::log(
             matchEnded{
