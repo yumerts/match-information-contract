@@ -49,7 +49,7 @@ struct Match{
     exists: StorageBool,
     player1: StorageAddress,
     player2: StorageAddress,
-    state: StorageU8 //0 for Finding, 1 for Matched (Ready for Prediction), 2 for Started, 3 for Ended
+    state: StorageU8 //0 for Finding, 1 for Matched, 2 for Ready (for Prediction), 3 for Started, 4 for Ended
 }
 
 #[storage]
@@ -156,8 +156,8 @@ impl MatchInformationContract{
         match_setter.player1.set(msg::sender());
         match_setter.state.set(U8::from(0));
 
-        let match_id = self.latest_match_id.get() + U256::from(1);
-        self.latest_match_id.set(match_id);
+        let match_id = self.latest_match_id.get();
+        self.latest_match_id.set(match_id + U256::from(1));
         
         evm::log(
             matchCreated{
@@ -191,18 +191,42 @@ impl MatchInformationContract{
         match_setter.player2.set(msg::sender());
         match_setter.state.set(U8::from(1));
 
-        let prediction_contract = IPredictionContract::new(self.prediction_smart_contract_address.get());
-        let prediction_pool_creation = prediction_contract.create_prediction_pool(self, match_id);
-        if prediction_pool_creation.is_err(){
-            return Err("Error Creating Prediction Pool".into());
-        }
-
         evm::log(
             matchJoined{
                 match_id: match_id,
                 player2: msg::sender()
             }
         );
+
+        Ok(())
+    }
+
+    pub fn open_prediction_market(&mut self, match_id: U256) -> Result<(), Vec<u8>>{
+        if !self.initialized.get() {
+            return Err("has not been initialized yet".into());
+        }
+
+        let current_match = self.matches.get(match_id);
+        if !current_match.exists.get(){
+            return Err("Match does not exist".into());
+        }
+
+        if current_match.state.get() != U8::from(1){
+            return Err("Match is not in the matched state".into());
+        }
+
+        if self.matchmaking_server_wallet_address.get() != msg::sender(){
+            return Err("Only match making server can open prediction market".into());
+        }
+
+        let mut match_setter = self.matches.setter(match_id);
+        match_setter.state.set(U8::from(2));
+
+        let prediction_contract = IPredictionContract::new(self.prediction_smart_contract_address.get());
+        let prediction_pool_creation = prediction_contract.create_prediction_pool(self, match_id);
+        if prediction_pool_creation.is_err(){
+            return Err("Error Creating Prediction Pool".into());
+        }
 
         Ok(())
     }
@@ -218,8 +242,8 @@ impl MatchInformationContract{
             return Err("Match does not exist".into());
         }
 
-        if current_match.state.get() != U8::from(1){
-            return Err("Match is not in the matched state".into());
+        if current_match.state.get() != U8::from(2){
+            return Err("Match is not in the ready state".into());
         }
 
         if self.matchmaking_server_wallet_address.get() != msg::sender(){
@@ -231,7 +255,7 @@ impl MatchInformationContract{
 
         //change match state to started
         let mut match_setter = self.matches.setter(match_id);
-        match_setter.state.set(U8::from(2));
+        match_setter.state.set(U8::from(3));
 
         let prediction_contract = IPredictionContract::new(self.prediction_smart_contract_address.get());
         let prediction_pool_creation = prediction_contract.stop_allow_prediction(self, match_id);
@@ -270,7 +294,7 @@ impl MatchInformationContract{
 
         //change match state to ended
         let mut match_setter = self.matches.setter(match_id);
-        match_setter.state.set(U8::from(3));
+        match_setter.state.set(U8::from(4));
 
         if self.update_player_info(winner, player1, player2).is_err(){
             return Err("Error Updating Player Information After Match Ended".into());
